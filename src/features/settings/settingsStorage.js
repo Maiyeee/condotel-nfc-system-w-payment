@@ -1,0 +1,5 @@
+export const DEFAULT_SETTINGS={property:{name:'Condotel',code:'CONDOTEL-001',email:'admin@condotel.com',phone:'+63 900 000 0000',address:'Philippines',currency:'PHP',timezone:'Asia/Manila'},payments:{currency:'PHP',environment:'Sandbox',cardEnabled:true,gcashEnabled:true,mayaEnabled:true,bankTransferEnabled:true},notifications:{reservations:true,payments:true,nfcAlerts:true,availability:true,email:false},security:{adminOnly:true,sessionTimeoutEnabled:true,sessionTimeoutMinutes:30,auditLogging:true}}
+const KEY='condotel.settings.phase6'
+export function loadSettings(){try{const p=JSON.parse(localStorage.getItem(KEY)||'null');if(!p)return DEFAULT_SETTINGS;return {...DEFAULT_SETTINGS,...p,property:{...DEFAULT_SETTINGS.property,...p.property},payments:{...DEFAULT_SETTINGS.payments,...p.payments},notifications:{...DEFAULT_SETTINGS.notifications,...p.notifications},security:{...DEFAULT_SETTINGS.security,...p.security}}}catch{return DEFAULT_SETTINGS}}
+export function saveSettings(s){localStorage.setItem(KEY,JSON.stringify(s))}
+export function resetSettings(){localStorage.removeItem(KEY);return DEFAULT_SETTINGS}
