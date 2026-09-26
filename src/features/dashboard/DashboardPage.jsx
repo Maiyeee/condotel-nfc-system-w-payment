@@ -74,14 +74,13 @@ export default function DashboardPage({
           </span>
         </div>
 
+        {/* Fixed KPI cards: solid white cards with visible dark text/icons. */}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Total Rooms"
             value={stats.totalRooms}
             helper={`+${stats.availableRooms} available`}
             icon={BedDouble}
-            iconClassName="bg-white/15 text-white"
-            valueClassName="text-white"
             onClick={() => navigate("rooms")}
           />
 
@@ -90,8 +89,6 @@ export default function DashboardPage({
             value={stats.currentGuests}
             helper={`${stats.occupancyRate}% occupancy`}
             icon={UsersRound}
-            iconClassName="bg-white/15 text-white"
-            valueClassName="text-white"
             onClick={() => navigate("guests")}
           />
 
@@ -100,8 +97,6 @@ export default function DashboardPage({
             value={stats.todaysCheckIns}
             helper="View details"
             icon={CalendarCheck}
-            iconClassName="bg-white/15 text-white"
-            valueClassName="text-white"
             onClick={() => navigate("reservations")}
           />
 
@@ -110,8 +105,6 @@ export default function DashboardPage({
             value={formatCurrency(stats.todaysPayments)}
             helper="View payment activity"
             icon={CreditCard}
-            iconClassName="bg-white/15 text-white"
-            valueClassName="text-white"
             onClick={() => setShowPayments((value) => !value)}
           />
         </section>
@@ -139,6 +132,7 @@ export default function DashboardPage({
                   Payment summary shown by the dashboard data source.
                 </p>
               </div>
+
               <button
                 type="button"
                 onClick={() => setShowPayments(false)}
@@ -164,6 +158,7 @@ export default function DashboardPage({
                     )}
                   </tr>
                 </thead>
+
                 <tbody>
                   {(data.todaysPayments || []).map((payment) => (
                     <tr
@@ -228,6 +223,7 @@ function QuickLink({ title, description, onClick }) {
         <p className="text-sm font-bold text-slate-800">{title}</p>
         <p className="mt-1 text-xs text-slate-400">{description}</p>
       </div>
+
       <ChevronRight
         size={17}
         className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#0b4f8a]"
