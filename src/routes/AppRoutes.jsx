@@ -9,6 +9,7 @@ import ReservationsPage from '@/features/reservations/ReservationsPage'
 import NfcManagementPage from '@/features/nfc/NfcManagementPage'
 import PaymentsPage from '@/features/payments/PaymentsPage'
 import TransactionsPage from '@/features/transactions/TransactionsPage'
+import { NotificationsPage } from '@/features/notifications'
 import ReportsPage from '@/features/reports/ReportsPage'
 import SettingsPage from '@/features/settings/SettingsPage'
 import { ROLES } from '@/lib/constants'
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
           { path: '/nfc', element: <NfcManagementPage />, handle: { title: 'NFC Management' } },
           { path: '/payments', element: <PaymentsPage />, handle: { title: 'Process Payment' } },
           { path: '/transactions', element: <TransactionsPage />, handle: { title: 'Transactions' } },
+          { path: '/notifications', element: <NotificationsPage />, handle: { title: 'Notifications' } },
           {
             element: <ProtectedRoute roles={[ROLES.ADMIN]} />,
             children: [

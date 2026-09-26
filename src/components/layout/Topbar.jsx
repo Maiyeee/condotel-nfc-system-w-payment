@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Search, Bell, ChevronDown, LogOut, User } from 'lucide-react'
+import { Search, ChevronDown, LogOut, User } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useNavigate } from 'react-router-dom'
+import { NotificationBell } from '@/features/notifications'
 
 export default function Topbar({ title }) {
   const user = useAuthStore((s) => s.user)
@@ -33,10 +34,7 @@ export default function Topbar({ title }) {
       </div>
 
       <div className="flex items-center gap-4">
-        <button className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger-600" />
-        </button>
+        <NotificationBell />
 
         <div className="relative">
           <button
