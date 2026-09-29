@@ -8,14 +8,31 @@ import {
 } from '../services/guestService.js'
 import {
   createGuestSchema,
+  guestListQuerySchema,
   updateGuestSchema
 } from '../validation/guestSchemas.js'
-import { parsePageQuery, validateBody } from '../validation/common.js'
+import { validateBody } from '../validation/common.js'
+import { HttpError } from '../utils/HttpError.js'
 
 export const guestRoutes = Router()
 
+function parseGuestQuery(query) {
+  const result = guestListQuerySchema.safeParse(query)
+
+  if (!result.success) {
+    throw new HttpError(
+      400,
+      'VALIDATION_ERROR',
+      'The guest query parameters are invalid.',
+      result.error.flatten()
+    )
+  }
+
+  return result.data
+}
+
 guestRoutes.get('/', (req, res) => {
-  const query = parsePageQuery(req.query)
+  const query = parseGuestQuery(req.query)
   const result = getGuests(query)
 
   res.json({
@@ -24,7 +41,7 @@ guestRoutes.get('/', (req, res) => {
       page: query.page,
       limit: query.limit,
       total: result.total,
-      totalPages: Math.max(1, Math.ceil(result.total / query.limit))
+      totalPages: Math.ceil(result.total / query.limit)
     }
   })
 })
@@ -38,6 +55,12 @@ guestRoutes.post('/', validateBody(createGuestSchema), (req, res) => {
 })
 
 guestRoutes.patch('/:id', validateBody(updateGuestSchema), (req, res) => {
+  res.json({ data: editGuest(req.params.id, req.validatedBody) })
+})
+
+// PUT is kept as an alias because the current Guests mock-data comments
+// describe GET/POST/PUT/DELETE as the planned backend contract.
+guestRoutes.put('/:id', validateBody(updateGuestSchema), (req, res) => {
   res.json({ data: editGuest(req.params.id, req.validatedBody) })
 })
 

@@ -10,6 +10,7 @@
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
     "db:verify": "node src/db/verify.js",
+    "test:guests": "node --test test/guests.test.js",
     "test": "node --test"
   },
   "engines": {

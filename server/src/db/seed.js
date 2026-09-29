@@ -7,8 +7,24 @@ import { runMigrations } from './migrate.js'
 const __filename = fileURLToPath(import.meta.url)
 
 const guests = [
-  ['guest-001', 'Maria Santos', 'maria.santos@example.com', '09171234567', 'Calbayog City', 'Active'],
-  ['guest-002', 'Juan Dela Cruz', 'juan.delacruz@example.com', '09181234567', 'Catbalogan City', 'Active']
+  [
+    'guest-001',
+    'Maria Santos',
+    'maria.santos@example.com',
+    '09171234567',
+    'PSA-0012346',
+    'Calbayog City',
+    'Active'
+  ],
+  [
+    'guest-002',
+    'Juan Dela Cruz',
+    'juan.delacruz@example.com',
+    '09181234567',
+    'PSA-0012345',
+    'Catbalogan City',
+    'Active'
+  ]
 ]
 
 const rooms = [
@@ -29,9 +45,15 @@ export function seedDevelopmentData() {
 
   const insertGuest = db.prepare(`
     INSERT INTO guests
-      (id, name, email, phone, address, status)
-    VALUES (?, ?, ?, ?, ?, ?)
+      (id, name, email, phone, id_number, address, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO NOTHING
+  `)
+
+  const fillGuestIdNumber = db.prepare(`
+    UPDATE guests
+    SET id_number = ?
+    WHERE id = ? AND trim(id_number) = ''
   `)
 
   const insertRoom = db.prepare(`
@@ -42,7 +64,11 @@ export function seedDevelopmentData() {
   `)
 
   const seed = db.transaction(() => {
-    for (const guest of guests) insertGuest.run(...guest)
+    for (const guest of guests) {
+      insertGuest.run(...guest)
+      fillGuestIdNumber.run(guest[4], guest[0])
+    }
+
     for (const room of rooms) insertRoom.run(...room)
   })
 
