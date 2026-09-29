@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { env } from '../config/env.js'
 import { db } from './database.js'
 import { runMigrations } from './migrate.js'
 
@@ -20,18 +21,24 @@ const rooms = [
 ]
 
 export function seedDevelopmentData() {
+  if (env.NODE_ENV === 'production') {
+    throw new Error('Development seed data is disabled when NODE_ENV=production.')
+  }
+
   runMigrations()
 
   const insertGuest = db.prepare(`
-    INSERT OR IGNORE INTO guests
+    INSERT INTO guests
       (id, name, email, phone, address, status)
     VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO NOTHING
   `)
 
   const insertRoom = db.prepare(`
-    INSERT OR IGNORE INTO rooms
+    INSERT INTO rooms
       (id, room_number, name, type, rate_centavos, status)
     VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO NOTHING
   `)
 
   const seed = db.transaction(() => {
@@ -40,9 +47,14 @@ export function seedDevelopmentData() {
   })
 
   seed()
+
+  return {
+    guests: db.prepare('SELECT COUNT(*) AS count FROM guests').get().count,
+    rooms: db.prepare('SELECT COUNT(*) AS count FROM rooms').get().count
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
-  seedDevelopmentData()
-  console.log('Development seed data is ready.')
+  const totals = seedDevelopmentData()
+  console.log(`Development seed data is ready. Guests: ${totals.guests}. Rooms: ${totals.rooms}.`)
 }
