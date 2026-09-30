@@ -5,13 +5,15 @@ import {
   editReservation,
   getReservation,
   getReservations,
+  getReservationsSummary,
   removeReservation
 } from '../services/reservationService.js'
 import {
   createReservationSchema,
+  reservationStatusSchema,
   updateReservationSchema
 } from '../validation/reservationSchemas.js'
-import { parsePageQuery, validateBody } from '../validation/common.js'
+import { dateSchema, parsePageQuery, validateBody } from '../validation/common.js'
 import { HttpError } from '../utils/HttpError.js'
 
 export const reservationRoutes = Router()
@@ -21,8 +23,15 @@ function parseReservationQuery(query) {
 
   const extra = z
     .object({
+      status: reservationStatusSchema.optional(),
       guestId: z.string().min(1).max(100).optional(),
-      roomId: z.string().min(1).max(100).optional()
+      roomId: z.string().min(1).max(100).optional(),
+      from: dateSchema.optional(),
+      to: dateSchema.optional()
+    })
+    .refine((value) => !value.from || !value.to || value.to > value.from, {
+      message: 'to must be later than from.',
+      path: ['to']
     })
     .safeParse(query)
 
@@ -35,8 +44,16 @@ function parseReservationQuery(query) {
     )
   }
 
-  return { ...common, ...extra.data }
+  return {
+    ...common,
+    ...extra.data,
+    status: extra.data.status
+  }
 }
+
+reservationRoutes.get('/summary', (_req, res) => {
+  res.json({ data: getReservationsSummary() })
+})
 
 reservationRoutes.get('/', (req, res) => {
   const query = parseReservationQuery(req.query)
@@ -65,12 +82,20 @@ reservationRoutes.post(
   }
 )
 
+function updateHandler(req, res) {
+  res.json({ data: editReservation(req.params.id, req.validatedBody) })
+}
+
 reservationRoutes.patch(
   '/:id',
   validateBody(updateReservationSchema),
-  (req, res) => {
-    res.json({ data: editReservation(req.params.id, req.validatedBody) })
-  }
+  updateHandler
+)
+
+reservationRoutes.put(
+  '/:id',
+  validateBody(updateReservationSchema),
+  updateHandler
 )
 
 reservationRoutes.delete('/:id', (req, res) => {

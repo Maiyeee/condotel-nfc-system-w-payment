@@ -11,6 +11,8 @@
     "seed": "node src/db/seed.js",
     "db:verify": "node src/db/verify.js",
     "test:guests": "node --test test/guests.test.js",
+    "test:rooms": "node --test test/rooms.test.js",
+    "test:reservations": "node --test test/reservations-charges.test.js",
     "test": "node --test"
   },
   "engines": {

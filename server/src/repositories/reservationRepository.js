@@ -19,17 +19,25 @@ function mapReservation(row) {
     status: row.status,
     notes: row.notes,
     version: row.version,
+    chargeCount: Number(row.charge_count || 0),
+    totalChargesCentavos: Number(row.total_charges_centavos || 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     guest: row.guest_name
-      ? { id: row.guest_id, name: row.guest_name, email: row.guest_email }
+      ? {
+          id: row.guest_id,
+          name: row.guest_name,
+          email: row.guest_email,
+          phone: row.guest_phone
+        }
       : undefined,
     room: row.room_number
       ? {
           id: row.room_id,
           roomNumber: row.room_number,
           name: row.room_name,
-          type: row.room_type
+          type: row.room_type,
+          rateCentavos: row.room_rate_centavos
         }
       : undefined
   }
@@ -40,22 +48,33 @@ const baseSelect = `
     r.*,
     g.name AS guest_name,
     g.email AS guest_email,
+    g.phone AS guest_phone,
     rm.room_number AS room_number,
     rm.name AS room_name,
-    rm.type AS room_type
+    rm.type AS room_type,
+    rm.rate_centavos AS room_rate_centavos,
+    (
+      SELECT COUNT(*)
+      FROM reservation_charges c
+      WHERE c.reservation_id = r.id
+    ) AS charge_count,
+    (
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN c.charge_type = 'Discount'
+            THEN -(c.amount_centavos * c.quantity)
+          ELSE c.amount_centavos * c.quantity
+        END
+      ), 0)
+      FROM reservation_charges c
+      WHERE c.reservation_id = r.id
+    ) AS total_charges_centavos
   FROM reservations r
   JOIN guests g ON g.id = r.guest_id
   JOIN rooms rm ON rm.id = r.room_id
 `
 
-export function listReservations({
-  page,
-  limit,
-  search,
-  status,
-  guestId,
-  roomId
-}) {
+function buildWhere({ search, status, guestId, roomId, from, to }) {
   const where = []
   const params = {}
 
@@ -87,7 +106,27 @@ export function listReservations({
     params.roomId = roomId
   }
 
-  const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  if (from && to) {
+    where.push('r.check_in < @to AND r.check_out > @from')
+    params.from = from
+    params.to = to
+  } else if (from) {
+    where.push('r.check_out > @from')
+    params.from = from
+  } else if (to) {
+    where.push('r.check_in < @to')
+    params.to = to
+  }
+
+  return {
+    clause: where.length ? `WHERE ${where.join(' AND ')}` : '',
+    params
+  }
+}
+
+export function listReservations(query) {
+  const { page, limit } = query
+  const { clause, params } = buildWhere(query)
   const offset = (page - 1) * limit
 
   const rows = db.prepare(`
@@ -110,6 +149,36 @@ export function listReservations({
 
 export function getReservationById(id) {
   return mapReservation(db.prepare(`${baseSelect} WHERE r.id = ?`).get(id))
+}
+
+export function getReservationSummary() {
+  const statuses = db.prepare(`
+    SELECT status, COUNT(*) AS count
+    FROM reservations
+    GROUP BY status
+  `).all()
+
+  const totals = db.prepare(`
+    SELECT
+      COUNT(*) AS total,
+      COALESCE(SUM(
+        CASE
+          WHEN status IN ('Pending', 'Confirmed', 'Checked-in') THEN 1
+          ELSE 0
+        END
+      ), 0) AS active
+    FROM reservations
+  `).get()
+
+  const byStatus = Object.fromEntries(
+    statuses.map((row) => [row.status, Number(row.count)])
+  )
+
+  return {
+    total: Number(totals.total || 0),
+    active: Number(totals.active || 0),
+    byStatus
+  }
 }
 
 export function findOverlap({ roomId, checkIn, checkOut, excludeId = null }) {
@@ -155,8 +224,12 @@ export function updateReservationWithVersion(id, version, values) {
     notes: 'notes'
   }
 
-  const entries = Object.entries(values).filter(([key]) => key in fieldMap)
+  const entries = Object.entries(values).filter(
+    ([key, value]) => key in fieldMap && value !== undefined
+  )
   const assignments = entries.map(([key]) => `${fieldMap[key]} = @${key}`)
+
+  if (assignments.length === 0) return { changes: 0 }
 
   return db.prepare(`
     UPDATE reservations
