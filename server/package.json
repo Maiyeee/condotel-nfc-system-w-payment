@@ -5,14 +5,19 @@
   "type": "module",
   "description": "Phase 7 backend foundation for the Condotel NFC System with Payment",
   "scripts": {
-    "dev": "nodemon src/server.js",
+    "dev": "nodemon --watch src --ext js,mjs,cjs,json src/server.js",
     "start": "node src/server.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
     "db:verify": "node src/db/verify.js",
+    "data:migrate:review": "node src/dataMigration/reviewLegacyExport.js",
+    "data:migrate:backup": "node src/dataMigration/backupDatabase.js",
+    "data:migrate:import": "node src/dataMigration/importLegacyData.js",
+    "data:migrate:verify": "node src/dataMigration/verifyDataMigration.js",
     "test:guests": "node --test test/guests.test.js",
     "test:rooms": "node --test test/rooms.test.js",
     "test:reservations": "node --test test/reservations-charges.test.js",
+    "test:data-migration": "node --test test/data-migration.test.js",
     "test": "node --test"
   },
   "engines": {

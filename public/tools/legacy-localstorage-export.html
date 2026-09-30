@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Condotel Legacy Data Export</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 980px; margin: 40px auto; padding: 0 20px; color: #13213a; background: #f6f8fc; }
+    .card { background: white; border: 1px solid #dbe3ef; border-radius: 14px; padding: 24px; margin-bottom: 18px; }
+    h1 { margin-top: 0; }
+    button { border: 0; border-radius: 8px; padding: 11px 16px; background: #12254b; color: white; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #e9eef7; color: #12254b; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e7ecf3; font-size: 14px; vertical-align: top; }
+    code { background: #eef2f8; padding: 2px 5px; border-radius: 4px; }
+    .muted { color: #66758c; font-size: 14px; }
+    .warn { color: #8a4b00; background: #fff7e6; padding: 12px; border-radius: 8px; }
+    .ok { color: #0f6b3f; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Phase 7G Legacy Browser Data Export</h1>
+    <p>This page reads Condotel-related localStorage from the same browser origin as your Vite app and exports it to JSON for review before SQLite import.</p>
+    <p class="warn">Payments, transactions, NFC, settings, and similar keys are exported for review only. Phase 7G does not import them as verified backend records.</p>
+    <p class="muted">Open this page from <code>http://localhost:5173/tools/legacy-localstorage-export.html</code>. Do not open the HTML file directly from your file system because localStorage is origin-specific.</p>
+    <button id="scan">Scan localStorage</button>
+    <button id="download" class="secondary" disabled>Download JSON</button>
+    <p id="status" class="muted"></p>
+  </div>
+
+  <div class="card">
+    <h2>Detected keys</h2>
+    <table>
+      <thead><tr><th>Key</th><th>Type</th><th>Records</th><th>Import scope</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4" class="muted">Click Scan localStorage.</td></tr></tbody>
+    </table>
+  </div>
+
+  <script>
+    const blockedPattern = /(password|secret|token|session|auth)/i
+    const relevantPattern = /(condotel|guest|customer|room|reservation|booking|charge|payment|transaction|nfc|setting|notification|report)/i
+    const deferredPattern = /(payment|transaction|nfc|setting|notification|report)/i
+    let exportPayload = null
+
+    function parseRaw(raw) {
+      try { return JSON.parse(raw) } catch { return raw }
+    }
+
+    function recordCount(value) {
+      if (Array.isArray(value)) return value.length
+      if (value && Array.isArray(value.data)) return value.data.length
+      if (value && Array.isArray(value.items)) return value.items.length
+      if (value && Array.isArray(value.records)) return value.records.length
+      return 0
+    }
+
+    function scan() {
+      const entries = []
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)
+        if (!key || !relevantPattern.test(key) || blockedPattern.test(key)) continue
+        const raw = localStorage.getItem(key)
+        const parsed = parseRaw(raw)
+        entries.push({ key, raw, parsed })
+      }
+      entries.sort((a, b) => a.key.localeCompare(b.key))
+
+      exportPayload = {
+        format: 'condotel-localstorage-export-v1',
+        exportedAt: new Date().toISOString(),
+        origin: window.location.origin,
+        entries,
+      }
+
+      const body = document.getElementById('rows')
+      body.innerHTML = ''
+      if (!entries.length) {
+        body.innerHTML = '<tr><td colspan="4" class="muted">No Condotel-related localStorage keys were found on this origin.</td></tr>'
+      } else {
+        for (const entry of entries) {
+          const type = Array.isArray(entry.parsed) ? 'Array' : typeof entry.parsed
+          const count = recordCount(entry.parsed)
+          const scope = deferredPattern.test(entry.key) ? 'Deferred, review only' : 'Phase 7G candidate'
+          const row = document.createElement('tr')
+          row.innerHTML = `<td><code>${entry.key}</code></td><td>${type}</td><td>${count}</td><td>${scope}</td>`
+          body.appendChild(row)
+        }
+      }
+
+      document.getElementById('download').disabled = entries.length === 0
+      document.getElementById('status').textContent = `${entries.length} relevant storage key(s) found.`
+    }
+
+    function download() {
+      if (!exportPayload) return
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      anchor.href = url
+      anchor.download = `condotel-legacy-localstorage-${stamp}.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      document.getElementById('status').innerHTML = '<span class="ok">Export downloaded. Review it before importing.</span>'
+    }
+
+    document.getElementById('scan').addEventListener('click', scan)
+    document.getElementById('download').addEventListener('click', download)
+  </script>
+</body>
+</html>

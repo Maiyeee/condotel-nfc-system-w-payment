@@ -1,285 +1,116 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  BedDouble,
-  CheckCircle2,
-  ChevronDown,
-  Edit3,
-  ImagePlus,
-  MoreVertical,
-  Plus,
-  Search,
-  Trash2,
-  Wrench,
-  X,
-  XCircle,
-} from "lucide-react";
-import RoomFormModal from "./RoomFormModal";
-import { DEFAULT_ROOMS, ROOM_STATUSES } from "./roomData";
-import { loadRooms, saveRooms } from "./roomStorage";
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { BedDouble, CheckCircle2, Edit3, Plus, Search, Trash2, Wrench, XCircle } from 'lucide-react'
+
+import { createRoom, deleteRoom, getRoomsSummary, listRooms, updateRoom } from '@/api/rooms'
+import { getApiErrorMessage } from '@/api/apiHelpers'
+import useDebouncedValue from '@/hooks/useDebouncedValue'
+import RoomFormModal from './RoomFormModal'
+
+const PAGE_SIZE = 24
+const ROOM_STATUSES = ['Available', 'Occupied', 'Maintenance', 'Out of Service']
 
 const STATUS_META = {
-  Available: {
-    className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
-    dot: "bg-emerald-500",
-    icon: CheckCircle2,
-  },
-  Occupied: {
-    className: "bg-red-50 text-red-700 ring-1 ring-red-200",
-    dot: "bg-red-500",
-    icon: XCircle,
-  },
-  Maintenance: {
-    className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
-    dot: "bg-amber-500",
-    icon: Wrench,
-  },
-};
-
-function StatusBadge({ status }) {
-  const meta = STATUS_META[status] ?? STATUS_META.Available;
-  const Icon = meta.icon;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.className}`}
-    >
-      <Icon size={12} />
-      {status}
-    </span>
-  );
-}
-
-function EmptyState({ onAdd }) {
-  return (
-    <div className="col-span-full flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-        <BedDouble size={26} />
-      </div>
-      <h3 className="text-base font-bold text-slate-900">No rooms found</h3>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">
-        Try a different search or add a new room to your condotel inventory.
-      </p>
-      <button
-        type="button"
-        onClick={onAdd}
-        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#0b4f8a] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#083d6c]"
-      >
-        <Plus size={17} />
-        Add Room
-      </button>
-    </div>
-  );
-}
-
-function RoomCard({ room, onEdit, onDelete, onStatusChange }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  return (
-    <article className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="relative h-44 overflow-hidden bg-slate-100">
-        {room.photo ? (
-          <img
-            src={room.photo}
-            alt={`${room.name} interior`}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-slate-400">
-            <ImagePlus size={34} />
-          </div>
-        )}
-
-        <div className="absolute left-3 top-3">
-          <StatusBadge status={room.status} />
-        </div>
-
-        <div className="absolute right-3 top-3">
-          <button
-            type="button"
-            aria-label={`Actions for ${room.name}`}
-            onClick={() => setMenuOpen((value) => !value)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/95 text-slate-600 shadow-sm backdrop-blur hover:bg-white"
-          >
-            <MoreVertical size={17} />
-          </button>
-
-          {menuOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onEdit(room);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-              >
-                <Edit3 size={15} />
-                Edit room
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onDelete(room.id);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-              >
-                <Trash2 size={15} />
-                Delete room
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">{room.name}</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
-              {room.type} Room · Floor {room.floor}
-            </p>
-          </div>
-          <p className="whitespace-nowrap text-sm font-bold text-slate-900">
-            ₱{Number(room.rate).toLocaleString()}
-            <span className="ml-1 text-[11px] font-medium text-slate-400">
-              / night
-            </span>
-          </p>
-        </div>
-
-        {room.description && (
-          <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">
-            {room.description}
-          </p>
-        )}
-
-        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-          <label className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
-            Status
-            <select
-              value={room.status}
-              onChange={(event) => onStatusChange(room.id, event.target.value)}
-              className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-[#0b4f8a]"
-            >
-              {ROOM_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button
-            type="button"
-            onClick={() => onEdit(room)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0b4f8a] hover:underline"
-          >
-            <Edit3 size={14} />
-            Manage
-          </button>
-        </div>
-      </div>
-    </article>
-  );
+  Available: { className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', icon: CheckCircle2 },
+  Occupied: { className: 'bg-red-50 text-red-700 ring-1 ring-red-200', icon: XCircle },
+  Maintenance: { className: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', icon: Wrench },
+  'Out of Service': { className: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200', icon: XCircle },
 }
 
 export default function RoomsPage() {
-  const [rooms, setRooms] = useState(() => loadRooms(DEFAULT_ROOMS));
-  const [activeStatus, setActiveStatus] = useState("All");
-  const [search, setSearch] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingRoom, setEditingRoom] = useState(null);
+  const [rooms, setRooms] = useState([])
+  const [meta, setMeta] = useState({ total: 0 })
+  const [summary, setSummary] = useState({ total: 0, available: 0, occupied: 0, maintenance: 0, outOfService: 0 })
+  const [activeStatus, setActiveStatus] = useState('All')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingRoom, setEditingRoom] = useState(null)
+  const debouncedSearch = useDebouncedValue(search, 300)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [result, summaryResult] = await Promise.all([
+        listRooms({
+          page: 1,
+          limit: PAGE_SIZE,
+          search: debouncedSearch,
+          status: activeStatus === 'All' ? '' : activeStatus,
+        }),
+        getRoomsSummary(),
+      ])
+      setRooms(result.data.map(toUiRoom))
+      setMeta(result.meta)
+      setSummary(summaryResult)
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Unable to load rooms.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [activeStatus, debouncedSearch])
 
   useEffect(() => {
-    saveRooms(rooms);
-  }, [rooms]);
+    load()
+  }, [load])
 
-  const filteredRooms = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    return rooms.filter((room) => {
-      const matchesStatus =
-        activeStatus === "All" || room.status === activeStatus;
-
-      const matchesSearch =
-        !normalizedSearch ||
-        [room.name, room.type, room.description, String(room.floor)]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedSearch);
-
-      return matchesStatus && matchesSearch;
-    });
-  }, [rooms, activeStatus, search]);
-
-  const counts = useMemo(
-    () => ({
-      All: rooms.length,
-      Available: rooms.filter((room) => room.status === "Available").length,
-      Occupied: rooms.filter((room) => room.status === "Occupied").length,
-      Maintenance: rooms.filter((room) => room.status === "Maintenance").length,
-    }),
-    [rooms],
-  );
+  const counts = useMemo(() => ({
+    All: summary.total,
+    Available: summary.available,
+    Occupied: summary.occupied,
+    Maintenance: summary.maintenance,
+    'Out of Service': summary.outOfService,
+  }), [summary])
 
   function openAddModal() {
-    setEditingRoom(null);
-    setModalOpen(true);
+    setEditingRoom(null)
+    setModalOpen(true)
   }
 
   function openEditModal(room) {
-    setEditingRoom(room);
-    setModalOpen(true);
+    setEditingRoom(room)
+    setModalOpen(true)
   }
 
-  function handleSave(roomInput) {
-    setRooms((current) => {
-      if (editingRoom) {
-        return current.map((room) =>
-          room.id === editingRoom.id
-            ? { ...room, ...roomInput, id: editingRoom.id }
-            : room,
-        );
+  async function handleSave(values) {
+    try {
+      const payload = {
+        roomNumber: values.roomNumber,
+        name: values.name,
+        type: values.type,
+        rateCentavos: Math.round(Number(values.rate) * 100),
+        status: values.status,
       }
-
-      return [
-        ...current,
-        {
-          ...roomInput,
-          id: `room-${Date.now()}`,
-          createdAt: new Date().toISOString(),
-        },
-      ];
-    });
-
-    setModalOpen(false);
-    setEditingRoom(null);
-  }
-
-  function handleDelete(id) {
-    const room = rooms.find((item) => item.id === id);
-    if (!room) return;
-
-    const confirmed = window.confirm(
-      `Delete ${room.name}? This action cannot be undone.`,
-    );
-
-    if (confirmed) {
-      setRooms((current) => current.filter((item) => item.id !== id));
+      if (editingRoom) {
+        await updateRoom(editingRoom.id, { ...payload, version: editingRoom.version })
+      } else {
+        await createRoom(payload)
+      }
+      await load()
+    } catch (requestError) {
+      window.alert(getApiErrorMessage(requestError, 'Unable to save room.'))
+      throw requestError
     }
   }
 
-  function handleStatusChange(id, status) {
-    setRooms((current) =>
-      current.map((room) => (room.id === id ? { ...room, status } : room)),
-    );
+  async function handleDelete(room) {
+    if (!window.confirm(`Delete ${room.name}? This action cannot be undone.`)) return
+    try {
+      await deleteRoom(room.id)
+      await load()
+    } catch (requestError) {
+      window.alert(getApiErrorMessage(requestError, 'Unable to delete room.'))
+    }
   }
 
-  function handleResetDemoData() {
-    setRooms(DEFAULT_ROOMS);
-    setActiveStatus("All");
-    setSearch("");
+  async function handleStatusChange(room, status) {
+    try {
+      await updateRoom(room.id, { version: room.version, status })
+      await load()
+    } catch (requestError) {
+      window.alert(getApiErrorMessage(requestError, 'Unable to update room status.'))
+    }
   }
 
   return (
@@ -287,134 +118,96 @@ export default function RoomsPage() {
       <div className="mx-auto max-w-[1600px]">
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#0b4f8a]">
-              Core Data Module
-            </p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#0b4f8a]">Core Data Module</p>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-[#102a43]">
-                Room Management
-              </h1>
-              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#0b4f8a]">
-                {rooms.length} rooms
-              </span>
+              <h1 className="text-2xl font-bold tracking-tight text-[#102a43]">Room Management</h1>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#0b4f8a]">{meta.total} total</span>
             </div>
-            <p className="mt-1 text-sm text-slate-500">
-              Manage condotel units, room types, nightly rates, photos, and
-              availability.
-            </p>
+            <p className="mt-1 text-sm text-slate-500">Rooms now load from the Phase 7 SQLite backend.</p>
           </div>
-
-          <button
-            type="button"
-            onClick={openAddModal}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0b4f8a] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#083d6c]"
-          >
-            <Plus size={17} />
-            Add Room
+          <button type="button" onClick={openAddModal} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0b4f8a] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#083d6c]">
+            <Plus size={17} /> Add Room
           </button>
         </header>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
-              {["All", ...ROOM_STATUSES].map((status) => {
-                const selected = activeStatus === status;
-
-                return (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => setActiveStatus(status)}
-                    className={`rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
-                      selected
-                        ? "bg-[#0b4f8a] text-white shadow-sm"
-                        : "bg-slate-50 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    {status}
-                    <span
-                      className={`ml-1.5 ${
-                        selected ? "text-blue-100" : "text-slate-400"
-                      }`}
-                    >
-                      {counts[status]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="relative w-full xl:max-w-sm">
-              <Search
-                size={17}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by room, type, floor..."
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-9 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#0b4f8a] focus:ring-2 focus:ring-blue-100"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  aria-label="Clear search"
-                  className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                >
-                  <X size={15} />
+              {['All', ...ROOM_STATUSES].map((status) => (
+                <button key={status} type="button" onClick={() => setActiveStatus(status)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${activeStatus === status ? 'bg-[#0b4f8a] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {status}{counts[status] !== undefined ? ` ${counts[status]}` : ''}
                 </button>
-              )}
+              ))}
+            </div>
+            <div className="relative w-full lg:w-80">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search room number, name, or type..." className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-[#0b4f8a] focus:ring-2 focus:ring-blue-100" />
             </div>
           </div>
         </section>
 
-        <section className="mt-5">
-          {filteredRooms.length === 0 ? (
-            <div className="grid">
-              <EmptyState onAdd={openAddModal} />
+        {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+        <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {loading ? (
+            <div className="col-span-full rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading rooms...</div>
+          ) : rooms.length === 0 ? (
+            <div className="col-span-full flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+              <BedDouble size={30} className="text-slate-400" />
+              <h3 className="mt-3 font-bold text-slate-900">No rooms found</h3>
+              <p className="mt-1 text-sm text-slate-500">Change your filter or add a room.</p>
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {filteredRooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  onEdit={openEditModal}
-                  onDelete={handleDelete}
-                  onStatusChange={handleStatusChange}
-                />
-              ))}
-            </div>
+            rooms.map((room) => <RoomCard key={room.id} room={room} onEdit={openEditModal} onDelete={handleDelete} onStatusChange={handleStatusChange} />)
           )}
         </section>
-
-        <div className="mt-6 flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            Room data is currently stored in your browser using localStorage.
-            It is ready to be connected to the Phase 2 rooms API later.
-          </p>
-          <button
-            type="button"
-            onClick={handleResetDemoData}
-            className="inline-flex items-center gap-1.5 font-semibold text-[#0b4f8a] hover:underline"
-          >
-            <ChevronDown size={14} />
-            Reset demo rooms
-          </button>
-        </div>
       </div>
 
-      {modalOpen && (
-        <RoomFormModal
-          room={editingRoom}
-          onClose={() => {
-            setModalOpen(false);
-            setEditingRoom(null);
-          }}
-          onSave={handleSave}
-        />
-      )}
+      {modalOpen && <RoomFormModal room={editingRoom} onClose={() => setModalOpen(false)} onSave={handleSave} />}
     </div>
-  );
+  )
+}
+
+function RoomCard({ room, onEdit, onDelete, onStatusChange }) {
+  const meta = STATUS_META[room.status] || STATUS_META.Available
+  const Icon = meta.icon
+  return (
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex h-32 items-center justify-center bg-gradient-to-br from-slate-100 to-blue-50 text-[#0b4f8a]">
+        <BedDouble size={40} />
+      </div>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Room {room.roomNumber}</p>
+            <h3 className="mt-1 text-sm font-bold text-slate-900">{room.name}</h3>
+            <p className="mt-0.5 text-xs text-slate-500">{room.type}</p>
+          </div>
+          <p className="text-sm font-bold text-slate-900">₱{Number(room.rate).toLocaleString()}<span className="ml-1 text-[11px] font-medium text-slate-400">/ night</span></p>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.className}`}><Icon size={12} />{room.status}</span>
+          <div className="flex gap-1">
+            <button type="button" onClick={() => onEdit(room)} className="rounded-lg p-2 text-[#0b4f8a] hover:bg-blue-50" aria-label={`Edit ${room.name}`}><Edit3 size={15} /></button>
+            <button type="button" onClick={() => onDelete(room)} className="rounded-lg p-2 text-red-500 hover:bg-red-50" aria-label={`Delete ${room.name}`}><Trash2 size={15} /></button>
+          </div>
+        </div>
+
+        <label className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+          Status
+          <select value={room.status} onChange={(event) => onStatusChange(room, event.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-[#0b4f8a]">
+            {ROOM_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        </label>
+      </div>
+    </article>
+  )
+}
+
+function toUiRoom(room) {
+  return {
+    ...room,
+    rate: Number(room.rateCentavos || 0) / 100,
+  }
 }
