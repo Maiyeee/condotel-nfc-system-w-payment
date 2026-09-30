@@ -14,10 +14,14 @@
     "data:migrate:backup": "node src/dataMigration/backupDatabase.js",
     "data:migrate:import": "node src/dataMigration/importLegacyData.js",
     "data:migrate:verify": "node src/dataMigration/verifyDataMigration.js",
+    "phase7:verify": "node src/handover/verifyPhase7.js",
+    "phase7:smoke": "node scripts/phase7-smoke.js",
+    "phase7:handover": "node src/handover/generateHandoverReport.js",
     "test:guests": "node --test test/guests.test.js",
     "test:rooms": "node --test test/rooms.test.js",
     "test:reservations": "node --test test/reservations-charges.test.js",
     "test:data-migration": "node --test test/data-migration.test.js",
+    "test:phase7-handover": "node --test test/phase7-handover.test.js",
     "test": "node --test"
   },
   "engines": {
